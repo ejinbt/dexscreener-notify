@@ -12,7 +12,7 @@ from sqlalchemy import create_engine , Column , String , Integer
 from sqlalchemy.orm import sessionmaker , declarative_base
 import requests
 import json
-
+import sys
 
 # Database Setup
 DATABASE_URL = "sqlite:///ranks.db"
@@ -31,7 +31,7 @@ Base.metadata.create_all(engine)
 
 TELEGRAM_BOT_TOKEN = "7318957699:AAGgHEqKoz2hxYrd6d7__Km9RAhfhPailmQ"
 TELEGRAM_CHAT_ID = "-4636119367"
-rank_threshold = 30
+rank_threshold = 5
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 
@@ -89,16 +89,20 @@ async def set_rank_threshold(update: Update, context: CallbackContext):
 # Scrape dexscreener for data
 async def scrape_dex():
     global previous_ranks
-    url = "https://dexscreener.com/?rankBy=trendingScoreH6&order=desc"
-
+    url = "https://dexscreener.com/?rankBy=trendingScoreM5&order=desc"
+    agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0"
+    
+    if "linux" in sys.platform:
+        agent = None
     # Initialize driver
-    driver = Driver(uc=True,headless=True)
+    driver = Driver(uc=True,headless=False,agent=agent)
+    
 
     try:
-        driver.get(url)
-        
+        driver.uc_open_with_reconnect(url,4)
+        driver.uc_gui_handle_cf()
         # Wait for the table to load
-        data_element = WebDriverWait(driver, 10).until(
+        data_element = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.CLASS_NAME, 'ds-dex-table'))
         )
 
@@ -111,6 +115,7 @@ async def scrape_dex():
             i = 0
 
             while i < len(data):
+                print("i entered here too")
                 if data[i].startswith("#"):  # New row starts
                     rank = data[i].replace("#","")
                     i += 1  
@@ -210,7 +215,7 @@ async def main():
     await application.start()
     while True:
         await scrape_dex()
-        print("[DEBUG] Sleeping for 10 seconds...")
+        print("[DEBUG] Sleeping for 60 seconds...")
         await asyncio.sleep(60)
 # Run the function
 if __name__ == "__main__":
